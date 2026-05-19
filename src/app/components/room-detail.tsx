@@ -122,11 +122,16 @@ export function RoomDetail({ room, user, onLeave, onOpenChat }: RoomDetailProps)
     const initCall = async () => {
       try {
         const data = await videoAPI.getToken(room.id);
-        if (data.success) {
+        if (data.success && data.url && data.token) {
+          console.log('🎥 Joining Daily room:', data.url);
           await join(data.url, data.token, user.username);
+        } else {
+          console.error('❌ Invalid video token response:', data);
+          toast.error('Video token error — check console');
         }
       } catch (e: any) {
-        toast.error('Could not connect video — showing presence mode');
+        console.error('❌ Video init error:', e);
+        toast.error(`Video error: ${e.message}`);
       }
     };
     initCall();
