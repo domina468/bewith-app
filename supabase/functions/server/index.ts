@@ -909,9 +909,9 @@ app.post('/rooms/:id/video-token', async (c) => {
   if (!dailyKey) return c.json({ error: 'Daily API key not configured' }, 500);
 
   const dailyRoomName = `bewith-${roomId}`;
-  const exp = Math.floor(Date.now() / 1000) + 3600 * 4; // 4 hours
+  const tokenExp = Math.floor(Date.now() / 1000) + 3600 * 24; // token platí 24 hodín
 
-  // Create Daily room (ignore 409 if already exists)
+  // Create Daily room (bez expirácie — roomka existuje kým ju nevymažeme)
   const createRes = await fetch('https://api.daily.co/v1/rooms', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${dailyKey}`, 'Content-Type': 'application/json' },
@@ -922,24 +922,27 @@ app.post('/rooms/:id/video-token', async (c) => {
         enable_screenshare: false,
         enable_recording: false,
         max_participants: 10,
-        exp,
       },
     }),
   });
 
   let roomUrl: string;
-  if (createRes.status === 409) {
-    const getRes = await fetch(`https://api.daily.co/v1/rooms/${dailyRoomName}`, {
-      headers: { 'Authorization': `Bearer ${dailyKey}` },
-    });
-    const existing = await getRes.json();
-    roomUrl = existing.url;
-  } else if (createRes.ok) {
+  if (createRes.ok) {
     const created = await createRes.json();
     roomUrl = created.url;
   } else {
+    // Daily returns 400 or 409 when room already exists — GET it
     const err = await createRes.json();
-    return c.json({ error: err.info ?? 'Failed to create Daily room' }, 500);
+    const errMsg: string = err.info ?? err.error ?? '';
+    if (createRes.status === 409 || errMsg.toLowerCase().includes('already exists')) {
+      const getRes = await fetch(`https://api.daily.co/v1/rooms/${dailyRoomName}`, {
+        headers: { 'Authorization': `Bearer ${dailyKey}` },
+      });
+      const existing = await getRes.json();
+      roomUrl = existing.url;
+    } else {
+      return c.json({ error: errMsg || 'Failed to create Daily room' }, 500);
+    }
   }
 
   // Generate meeting token for this user
@@ -952,7 +955,7 @@ app.post('/rooms/:id/video-token', async (c) => {
         user_id: auth.user.id,
         user_name: auth.user.user_metadata?.username ?? 'Guest',
         is_owner: false,
-        exp,
+        exp: tokenExp,
       },
     }),
   });

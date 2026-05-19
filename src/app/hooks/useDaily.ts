@@ -44,16 +44,16 @@ export function useDaily() {
       const call = DailyIframe.createCallObject({
         audioSource: true,
         videoSource: true,
-        dailyConfig: { experimentalChromeVideoMuteLightOff: true },
+        subscribeToTracksAutomatically: true,
       });
       callRef.current = call;
 
-      call.on('joined-meeting',    refreshParticipants);
+      call.on('joined-meeting',     refreshParticipants);
       call.on('participant-joined', refreshParticipants);
       call.on('participant-updated', refreshParticipants);
-      call.on('participant-left',  refreshParticipants);
-      call.on('track-started',     refreshParticipants);
-      call.on('track-stopped',     refreshParticipants);
+      call.on('participant-left',   refreshParticipants);
+      call.on('track-started',      refreshParticipants);
+      call.on('track-stopped',      refreshParticipants);
       call.on('error', (e: any) => {
         setError(e?.errorMsg ?? 'Call error');
         setCallState('error');
@@ -61,6 +61,7 @@ export function useDaily() {
 
       await call.join({ url: roomUrl, token, userName });
       setCallState('joined');
+      refreshParticipants();
     } catch (e: any) {
       setError(e.message ?? 'Failed to join');
       setCallState('error');

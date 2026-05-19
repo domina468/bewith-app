@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { Mic, MicOff, VideoOff } from 'lucide-react';
 import type { ParticipantState } from '../hooks/useDaily';
 
 const GRADIENTS = [
@@ -18,14 +18,28 @@ interface VideoTileProps {
 
 export function VideoTile({ participant, index, mood }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const gradient = GRADIENTS[index % GRADIENTS.length];
 
+  // Video track
   useEffect(() => {
-    if (!videoRef.current || !participant.videoTrack) return;
+    const el = videoRef.current;
+    if (!el || !participant.videoTrack) return;
     const stream = new MediaStream([participant.videoTrack]);
-    videoRef.current.srcObject = stream;
-    return () => { if (videoRef.current) videoRef.current.srcObject = null; };
+    el.srcObject = stream;
+    el.play().catch(() => {});
+    return () => { el.srcObject = null; };
   }, [participant.videoTrack]);
+
+  // Audio track — len pre remote účastníkov (local je muted aby nebolo echo)
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el || !participant.audioTrack || participant.isLocal) return;
+    const stream = new MediaStream([participant.audioTrack]);
+    el.srcObject = stream;
+    el.play().catch(() => {});
+    return () => { el.srcObject = null; };
+  }, [participant.audioTrack, participant.isLocal]);
 
   const showVideo = participant.videoOn && !!participant.videoTrack;
   const initial = participant.userName.charAt(0).toUpperCase();
@@ -41,9 +55,16 @@ export function VideoTile({ participant, index, mood }: VideoTileProps) {
       {showVideo && (
         <video
           ref={videoRef}
-          autoPlay muted={participant.isLocal} playsInline
+          autoPlay
+          muted
+          playsInline
           className="absolute inset-0 w-full h-full object-cover"
         />
+      )}
+
+      {/* Audio — skrytý element pre remote audio */}
+      {!participant.isLocal && (
+        <audio ref={audioRef} autoPlay playsInline style={{ display: 'none' }} />
       )}
 
       {/* Avatar fallback */}
