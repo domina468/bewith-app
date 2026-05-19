@@ -44,11 +44,6 @@ const SOUNDS = [
 
 const REACTIONS = ['👍','🌱','✨','☕','💪','🙏'];
 
-const MOCK_EXTRA = [
-  { id:'m1', userName:'Sarah',   mood:'Focused'   },
-  { id:'m2', userName:'Mike',    mood:'Calm'       },
-  { id:'m3', userName:'Emma',    mood:'Motivated'  },
-];
 
 export function RoomDetail({ room, user, onLeave, onOpenChat }: RoomDetailProps) {
   const { callState, participants, localParticipant, error, join, leave, toggleMic, toggleCamera } = useDaily();
@@ -169,12 +164,14 @@ export function RoomDetail({ room, user, onLeave, onOpenChat }: RoomDetailProps)
   const fmt = (m: number) => m < 60 ? `${m}m` : `${Math.floor(m/60)}h ${m%60}m`;
   const moodCfg = MOOD_CFG[mood];
 
-  // Tiles = real Daily participants + mock fill if < 2 total
+  // Video tiles — len reálni Daily účastníci
   const realTiles = participants.slice(0, 6);
-  const totalShown = realTiles.length;
-  const mockFill = totalShown < 2
-    ? MOCK_EXTRA.slice(0, 2 - totalShown)
-    : [];
+
+  // Presence tiles — účastníci bez videa (z presence, nie v Daily)
+  const dailyUserNames = new Set(participants.map(p => p.userName.toLowerCase()));
+  const presenceOnly = presenceMembers.filter(
+    m => !dailyUserNames.has(m.username.toLowerCase())
+  );
 
   const isVideoOff = !localParticipant?.videoOn;
   const isMuted    = !localParticipant?.audioOn;
@@ -255,21 +252,20 @@ export function RoomDetail({ room, user, onLeave, onOpenChat }: RoomDetailProps)
               mood={p.isLocal ? `${moodCfg.emoji} ${mood}` : undefined}/>
           ))}
 
-          {/* Mock fill for visual completeness when call hasn't started yet */}
-          {mockFill.map((m, i) => {
+          {/* Presence-only tiles — ľudia v roomke bez videa */}
+          {presenceOnly.map((m) => {
             const mc = MOOD_CFG[m.mood as keyof typeof MOOD_CFG];
             return (
-              <div key={m.id} className="aspect-[3/4] rounded-3xl overflow-hidden relative flex flex-col items-center justify-center gap-2"
+              <div key={m.userId} className="aspect-[3/4] rounded-3xl overflow-hidden relative flex flex-col items-center justify-center gap-2"
                 style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)' }}>
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white"
                   style={{ background:'linear-gradient(135deg,#A78BFA,#7C65F5)' }}>
-                  {m.userName[0]}
+                  {m.username[0].toUpperCase()}
                 </div>
-                <p className="text-white/60 text-sm font-medium">{m.userName}</p>
+                <p className="text-white/60 text-sm font-medium">{m.username}</p>
                 {mc && <p className="text-white/35 text-xs">{mc.emoji} {m.mood}</p>}
                 <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">
-                  <span className="text-xs text-white/50 bg-black/30 px-2 py-0.5 rounded-full">{m.userName}</span>
-                  <Mic className="w-3 h-3 text-emerald-400/60"/>
+                  <span className="text-xs text-white/50 bg-black/30 px-2 py-0.5 rounded-full">{m.username}</span>
                 </div>
               </div>
             );

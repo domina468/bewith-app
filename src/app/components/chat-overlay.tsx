@@ -29,6 +29,7 @@ export function ChatOverlay({ roomId, user, onClose }: ChatOverlayProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Načítaj históriu správ
   useEffect(() => {
@@ -50,7 +51,9 @@ export function ChatOverlay({ roomId, user, onClose }: ChatOverlayProps) {
 
   // Supabase Realtime Broadcast — live správy
   useEffect(() => {
-    const channel = supabase.channel(`room:${roomId}`);
+    const channel = supabase.channel(`chat:${roomId}`, {
+      config: { broadcast: { self: false } },
+    });
 
     channel
       .on('broadcast', { event: 'chat_message' }, ({ payload }) => {
@@ -68,7 +71,12 @@ export function ChatOverlay({ roomId, user, onClose }: ChatOverlayProps) {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
   }, [roomId]);
 
   // Auto-scroll na najnovšiu správu
@@ -98,20 +106,21 @@ export function ChatOverlay({ roomId, user, onClose }: ChatOverlayProps) {
     try {
       const res = await chatAPI.sendMessage(roomId, text, emoji);
 
-      // Broadcast ostatným
-      const channel = supabase.channel(`room:${roomId}`);
-      await channel.send({
-        type: 'broadcast',
-        event: 'chat_message',
-        payload: {
-          id: res.message?.id || tempId,
-          userId: user.id || user.username,
-          userName: user.username,
-          text,
-          timestamp: newMsg.timestamp.toISOString(),
-          emoji,
-        },
-      });
+      // Broadcast ostatným cez existujúci subscribed kanál
+      if (channelRef.current) {
+        await channelRef.current.send({
+          type: 'broadcast',
+          event: 'chat_message',
+          payload: {
+            id: res.message?.id || tempId,
+            userId: user.id || user.username,
+            userName: user.username,
+            text,
+            timestamp: newMsg.timestamp.toISOString(),
+            emoji,
+          },
+        });
+      }
     } catch {
       // Správa ostane lokálne aj pri chybe
     } finally {
