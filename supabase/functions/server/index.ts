@@ -839,9 +839,62 @@ app.post('/users/block', async (c) => {
   }
 });
 
+// Delete room (creator only)
+app.delete('/rooms/:roomId', async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    const validationResult = await validateUser(authHeader);
+    if (validationResult.error) {
+      return c.json({ error: validationResult.error }, validationResult.status);
+    }
+
+    const { roomId } = c.req.param();
+    const room = await kv.get(`room:${roomId}`);
+
+    if (!room) return c.json({ error: 'Room not found' }, 404);
+    if (room.creatorId !== validationResult.userId) {
+      return c.json({ error: 'Only the creator can delete this room' }, 403);
+    }
+
+    await kv.del(`room:${roomId}`);
+    await kv.del(`room:${roomId}:session`);
+
+    return c.json({ success: true });
+  } catch (error) {
+    return c.json({ error: `Failed to delete room: ${error.message}` }, 500);
+  }
+});
+
 // ==================== HEALTH CHECK ====================
 
-app.get('/health', (c) => {
+app.get('/health', async (c) => {
+  // Seed defaultné roomky ak neexistujú
+  const existing = await kv.getByPrefix('room:');
+  const rooms = existing.filter(r => r && !r.key.includes(':session') && !r.key.includes(':messages'));
+
+  if (rooms.length === 0) {
+    const defaults = [
+      { name: 'Study Together', category: 'Study', description: 'Focus alongside others in silence or soft music', maxUsers: 50 },
+      { name: 'Deep Work', category: 'Work', description: 'Accountability sessions for focused deep work', maxUsers: 50 },
+      { name: 'Morning Routine', category: 'Morning', description: 'Start your day alongside early risers', maxUsers: 30 },
+      { name: 'Chill & Music', category: 'Relax', description: 'Unwind with ambient sounds and good company', maxUsers: 50 },
+      { name: 'Cleaning Vibes', category: 'Cleaning', description: 'Get motivated to tidy up together', maxUsers: 30 },
+    ];
+
+    for (const d of defaults) {
+      const roomId = `default_${d.name.toLowerCase().replace(/\s+/g, '_')}`;
+      await kv.set(`room:${roomId}`, {
+        id: roomId,
+        ...d,
+        currentUsers: 0,
+        isActive: true,
+        backgroundSound: 'silence',
+        creatorId: 'system',
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
   return c.json({ success: true, message: 'BeWith server is running!' });
 });
 

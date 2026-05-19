@@ -171,6 +171,10 @@ export const roomsAPI = {
       body: JSON.stringify({ mode, mood }),
     });
   },
+
+  delete: async (roomId: string) => {
+    return fetchWithAuth(`/rooms/${roomId}`, { method: 'DELETE' });
+  },
 };
 
 // ==================== CHAT API ====================

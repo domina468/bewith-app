@@ -206,6 +206,16 @@ function App() {
     }
   };
 
+  const handleDeleteRoom = async (room: Room) => {
+    try {
+      await roomsAPI.delete(room.id);
+      toast.success(`"${room.name}" zmazaná`);
+      loadRooms();
+    } catch (error: any) {
+      toast.error(error.message || 'Nepodarilo sa zmazať roomku');
+    }
+  };
+
   const handleCreateRoom = async (roomData: RoomData) => {
     try {
       const response = await roomsAPI.create({
@@ -282,6 +292,7 @@ function App() {
             user={user}
             rooms={rooms}
             onJoinRoom={handleJoinRoom}
+            onDeleteRoom={handleDeleteRoom}
             onProfileClick={() => setCurrentScreen('profile')}
             onNotificationsClick={() => setCurrentScreen('notifications')}
             onCreateRoom={() => setShowCreateRoom(true)}

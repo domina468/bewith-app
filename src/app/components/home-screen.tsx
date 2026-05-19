@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Bell, Flame, Plus, Users, ChevronRight, Settings } from 'lucide-react';
+import { Search, Bell, Flame, Plus, Users, ChevronRight, Settings, Trash2 } from 'lucide-react';
 
 interface Room {
   id: string; name: string; category: string; description: string;
   currentUsers: number; maxUsers: number; imageUrl: string;
-  isActive: boolean; isFavorite?: boolean;
+  isActive: boolean; isFavorite?: boolean; creatorId?: string;
 }
 
 interface HomeScreenProps {
-  user: { username: string; email: string; streak?: number };
+  user: { id?: string; username: string; email: string; streak?: number };
   rooms?: Room[];
   onJoinRoom: (room: Room) => void;
+  onDeleteRoom?: (room: Room) => void;
   onProfileClick: () => void;
   onNotificationsClick: () => void;
   onCreateRoom: () => void;
@@ -36,7 +37,7 @@ const MOCK_ROOMS: Room[] = [
 
 const CATEGORIES = ['All', 'Study', 'Work', 'Cleaning', 'Morning', 'Relax'];
 
-export function HomeScreen({ user, rooms, onJoinRoom, onProfileClick, onNotificationsClick, onCreateRoom, onSettingsClick }: HomeScreenProps) {
+export function HomeScreen({ user, rooms, onJoinRoom, onDeleteRoom, onProfileClick, onNotificationsClick, onCreateRoom, onSettingsClick }: HomeScreenProps) {
   const [query, setQuery] = useState('');
   const [cat, setCat] = useState<string | null>(null);
   const [searchFocus, setSearchFocus] = useState(false);
@@ -168,7 +169,7 @@ export function HomeScreen({ user, rooms, onJoinRoom, onProfileClick, onNotifica
           <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.18 }}>
             <SectionLabel>Your Favourites</SectionLabel>
             <div className="space-y-2.5">
-              {favs.map((r, i) => <RoomRow key={r.id} room={r} onJoin={onJoinRoom} index={i}/>)}
+              {favs.map((r, i) => <RoomRow key={r.id} room={r} onJoin={onJoinRoom} index={i} userId={user.id} onDelete={onDeleteRoom}/>)}
             </div>
           </motion.div>
         )}
@@ -186,7 +187,7 @@ export function HomeScreen({ user, rooms, onJoinRoom, onProfileClick, onNotifica
 
           <div className="space-y-2.5">
             {(query || cat ? filtered : rest).map((r, i) => (
-              <RoomRow key={r.id} room={r} onJoin={onJoinRoom} index={i}/>
+              <RoomRow key={r.id} room={r} onJoin={onJoinRoom} index={i} userId={user.id} onDelete={onDeleteRoom}/>
             ))}
           </div>
 
@@ -308,20 +309,23 @@ function HeroCard({ room, onJoin }: { room:Room; onJoin:(r:Room)=>void }) {
   );
 }
 
-function RoomRow({ room, onJoin, index }: { room:Room; onJoin:(r:Room)=>void; index:number }) {
+function RoomRow({ room, onJoin, index, userId, onDelete }: {
+  room: Room; onJoin: (r:Room) => void; index: number;
+  userId?: string; onDelete?: (r:Room) => void;
+}) {
   const cfg = CAT_CFG[room.category];
+  const isCreator = userId && room.creatorId === userId;
+
   return (
     <motion.div
       initial={{ opacity:0, y:14 }}
       animate={{ opacity:1, y:0 }}
       transition={{ delay: index * 0.05, duration:0.4, ease:[0.22,1,0.36,1] }}
-      whileHover={{ scale:1.01, x:2 }} whileTap={{ scale:0.99 }}
-      onClick={() => onJoin(room)}
-      className="bw-glass bw-glass-hover flex items-center gap-4 p-3.5 rounded-2xl cursor-pointer"
+      className="bw-glass bw-glass-hover flex items-center gap-4 p-3.5 rounded-2xl"
       style={{ boxShadow:'0 2px 12px rgba(0,0,0,0.3)' }}
     >
       {/* Thumbnail */}
-      <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0">
+      <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => onJoin(room)}>
         <img src={room.imageUrl} alt={room.name} className="w-full h-full object-cover"/>
         {!room.isActive && <div className="absolute inset-0" style={{ background:'rgba(8,11,18,0.55)' }}/>}
         {room.isActive && (
@@ -331,7 +335,7 @@ function RoomRow({ room, onJoin, index }: { room:Room; onJoin:(r:Room)=>void; in
       </div>
 
       {/* Text */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onJoin(room)}>
         <div className="flex items-center gap-2 mb-0.5">
           <h4 className="text-sm font-semibold truncate" style={{ color:'#EEEEFF' }}>{room.name}</h4>
           {!room.isActive && (
@@ -354,7 +358,17 @@ function RoomRow({ room, onJoin, index }: { room:Room; onJoin:(r:Room)=>void; in
         </div>
       </div>
 
-      <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color:'rgba(238,238,255,0.18)' }}/>
+      {isCreator && onDelete ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(room); }}
+          className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 transition-colors hover:bg-red-500/20"
+          style={{ color:'rgba(238,82,82,0.5)' }}
+        >
+          <Trash2 className="w-4 h-4"/>
+        </button>
+      ) : (
+        <ChevronRight className="w-4 h-4 flex-shrink-0 cursor-pointer" style={{ color:'rgba(238,238,255,0.18)' }} onClick={() => onJoin(room)}/>
+      )}
     </motion.div>
   );
 }
